@@ -1,0 +1,17 @@
+{
+  "name": "Aurora — la tua giornata, in un colpo d'occhio",
+  "short_name": "Aurora",
+  "description": "Meteo live, qualità dell'aria, ciclo del sole, focus timer, task, note, convertitore valute e unità, generatore QR. Tutto in una pagina, anche offline.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#05060f",
+  "theme_color": "#05060f",
+  "lang": "it",
+  "categories": ["productivity", "utilities", "weather"],
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
