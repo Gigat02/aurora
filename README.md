@@ -10,6 +10,15 @@ Sfondo con aurora boreale in WebGL, tema chiaro/scuro, installabile come app, **
 
 ---
 
+## Come ci si muove
+
+Aurora è divisa in cinque viste — **Panoramica, Meteo, Giornata, Strumenti, Video** — raggiungibili
+dalle schede in alto (barra in basso su telefono). Ogni vista ha il suo indirizzo (`#/meteo`,
+`#/video`, …), quindi il tasto Indietro funziona e i link sono condivisibili.
+
+Il pulsante **Menu** apre il launcher con tutte e 15 le funzionalità in un colpo d'occhio: si clicca
+una voce e si finisce direttamente sulla card giusta, che si illumina un istante per farsi trovare.
+
 ## Cosa sa fare
 
 | | |
@@ -23,7 +32,29 @@ Sfondo con aurora boreale in WebGL, tema chiaro/scuro, installabile come app, **
 | **Cambio valuta** | 31 valute ai tassi ufficiali BCE. |
 | **Convertitore** | Lunghezza, peso, volume, velocità, area, dati e temperatura. |
 | **Generatore QR** | Link, testo o credenziali Wi-Fi, scaricabile in PNG ad alta risoluzione. |
+| **Salva video** | Da un link diretto a un file video: anteprima, peso e durata, poi un pulsante di conferma e il download in streaming. |
 | **Barra comandi** | `Ctrl` + `K` ovunque: fa da calcolatrice, converte valute al volo, crea task e salta tra le sezioni. |
+
+### Salva video: cosa funziona e cosa no
+
+Aurora è un sito statico: il download avviene **nel tuo browser**, il file va dritto sul dispositivo
+e non passa da nessun server intermedio. Questo pone un limite preciso, che vale la pena conoscere.
+
+**Funziona** con i link diretti a un file (`.mp4`, `.webm`, `.ogg`, `.mov`, `.m4v`, `.mkv`), quando il
+server che lo ospita permette la lettura da altri siti (header CORS): tipicamente video tuoi, su un
+tuo spazio web, su GitHub Pages o su uno storage configurato per farlo. Su Chrome ed Edge scegli tu
+dove salvarlo e il file viene scritto in streaming, senza passare per la memoria.
+
+**Non funziona** con gli indirizzi delle pagine di YouTube, Instagram, TikTok, Facebook o X: lì il
+video non è un file ma un flusso da ricostruire, servirebbe un estrattore lato server e i termini di
+servizio di quelle piattaforme non lo consentono. Aurora lo dice apertamente invece di fallire in
+silenzio. Non funzionano nemmeno i manifesti di streaming `.m3u8` e `.mpd`, fatti di centinaia di
+segmenti da ricomporre.
+
+Quando il server ospita il file ma ne vieta la lettura da altri siti, Aurora mostra comunque
+l'anteprima e ti offre **Apri in una scheda**, così puoi salvarlo con il browser.
+
+> Scarica solo video che puoi scaricare: tuoi, con licenza libera, o per cui hai il permesso.
 
 ### La barra comandi in pratica
 
@@ -58,9 +89,9 @@ Poi apri **http://localhost:5173**.
 Tre file, zero build, zero dipendenze, zero framework.
 
 ```
-index.html    struttura
+index.html    struttura, divisa in cinque viste
 styles.css    design system (variabili CSS, tema chiaro/scuro, layout bento)
-app.js        tutta la logica
+app.js        router, meteo, strumenti, menu e download video
 sw.js         service worker: la app resta usabile senza rete
 serve.js      server statico minimo per lo sviluppo locale
 ```

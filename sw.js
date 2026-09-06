@@ -1,7 +1,7 @@
 /* Aurora — service worker
    App shell in cache-first, API sempre dalla rete (con fallback alla cache). */
 
-const VERSION = "aurora-v1";
+const VERSION = "aurora-v2";
 const SHELL = [
   "./",
   "./index.html",

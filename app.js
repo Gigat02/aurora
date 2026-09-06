@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    Aurora — app.js
    Nessuna dipendenza esterna. Tutto vanilla, tutto offline-first.
    ============================================================ */
@@ -257,7 +257,9 @@
 
   async function loadWeather(lat, lon, placeName) {
     state.lat = lat; state.lon = lon;
-    $("#place").textContent = placeName || "Posizione corrente";
+    const nice = placeName || "Posizione corrente";
+    $("#place").textContent = nice;
+    $("#meteoPlace").textContent = nice;
 
     const wUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon +
       "&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,is_day" +
@@ -1097,23 +1099,23 @@
   let pItems = [], pSel = 0;
 
   const COMMANDS = [
-    { ico: "☀", title: "Vai al meteo", sub: "previsioni, aria, sole", run: () => goto("deck-meteo") },
-    { ico: "◷", title: "Avvia il focus timer", sub: "pomodoro 25 minuti", run: () => { goto("deck-focus"); startFocus(); } },
-    { ico: "✓", title: "Vai ai task", sub: "la tua lista di oggi", run: () => goto("deck-task") },
-    { ico: "⚙", title: "Vai agli strumenti", sub: "valute, unità, QR", run: () => goto("deck-tools") },
+    { ico: "☀", title: "Vai al meteo", sub: "previsioni, aria, sole", run: () => showView("meteo") },
+    { ico: "◷", title: "Avvia il focus timer", sub: "pomodoro 25 minuti", run: () => { showView("giornata", { card: "focusCard" }); startFocus(); } },
+    { ico: "✓", title: "Vai ai task", sub: "la tua lista di oggi", run: () => showView("giornata", { card: "taskCard" }) },
+    { ico: "⚙", title: "Vai agli strumenti", sub: "valute, unità, QR", run: () => showView("strumenti") },
+    { ico: "⬇", title: "Salva un video", sub: "da un link diretto", run: () => showView("video") },
+    { ico: "▦", title: "Apri il menu", sub: "tutte le funzionalità", run: () => openMenu() },
     { ico: "◐", title: "Cambia tema", sub: "chiaro / scuro", run: () => applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark") },
-    { ico: "⌖", title: "Cambia città", sub: "cerca un'altra località", run: () => { goto("top"); citySearch.hidden = false; setTimeout(() => cityInput.focus(), 400); } },
-    { ico: "⟳", title: "Aggiorna il meteo", sub: "ricarica i dati live", run: () => { if (state.lat != null) loadWeather(state.lat, state.lon, $("#place").textContent).then(() => toast("Meteo aggiornato.")); } }
+    { ico: "⌖", title: "Cambia città", sub: "cerca un'altra località", run: () => { showView("panoramica"); citySearch.hidden = false; setTimeout(() => cityInput.focus(), 380); } },
+    { ico: "⟳", title: "Aggiorna il meteo", sub: "ricarica i dati live", run: refreshWeather }
   ];
 
-  function goto(id) {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: id === "top" ? "start" : "start" });
+  function refreshWeather() {
+    if (state.lat == null) return;
+    loadWeather(state.lat, state.lon, $("#place").textContent)
+      .then(() => toast("Meteo aggiornato."))
+      .catch(() => toast("Non riesco ad aggiornare il meteo."));
   }
-  document.addEventListener("click", (e) => {
-    const b = e.target.closest("[data-goto]");
-    if (b) goto(b.dataset.goto);
-  });
 
   function safeMath(expr) {
     const cleaned = expr.replace(/,/g, ".").replace(/\^/g, "**").replace(/×/g, "*").replace(/÷/g, "/");
@@ -1149,7 +1151,7 @@
           const txt = v.toLocaleString("it-IT", { maximumFractionDigits: 2, minimumFractionDigits: 2 }) + " " + to;
           out.push({
             ico: "€", title: amt + " " + from + " = ", big: txt, sub: "tassi BCE del " + rates.date,
-            run: () => { $("#fxAmount").value = amt; $("#fxFrom").value = from; $("#fxTo").value = to; calcFx(); goto("deck-tools"); }
+            run: () => { $("#fxAmount").value = amt; $("#fxFrom").value = from; $("#fxTo").value = to; calcFx(); showView("strumenti", { card: "fxCard" }); }
           });
         }
       }
@@ -1161,7 +1163,7 @@
       // 4) in fondo, la scorciatoia per trasformare il testo in un task
       out.push({
         ico: "+", title: 'Aggiungi task: "' + q + '"', sub: "finisce in cima alla lista di oggi",
-        run: () => { addTask(q); goto("deck-task"); toast("Task aggiunto."); }
+        run: () => { addTask(q); showView("giornata", { card: "taskCard" }); toast("Task aggiunto."); }
       });
       return out;
     }
@@ -1224,27 +1226,20 @@
   /* ==========================================================
      12. REVEAL ON SCROLL
      ========================================================== */
-  function show(el, delay) {
-    setTimeout(() => {
-      el.classList.add("in");
-      // rete di sicurezza: tolta la classe base, il contenuto resta visibile
-      // anche se la transizione non viene mai completata dal browser.
-      setTimeout(() => el.classList.remove("reveal"), 1100);
-    }, delay);
+  // Le card compaiono a cascata quando la loro vista diventa attiva.
+  // Tolta la classe base, il contenuto resta visibile anche se la
+  // transizione non viene mai completata dal browser.
+  function revealIn(root) {
+    $$(".reveal", root).forEach((el, i) => {
+      setTimeout(() => {
+        el.classList.add("in");
+        setTimeout(() => el.classList.remove("reveal"), 950);
+      }, 40 + i * 70);
+    });
   }
 
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach((en, i) => {
-      if (!en.isIntersecting) return;
-      show(en.target, i * 70);
-      io.unobserve(en.target);
-    });
-  }, { threshold: 0.05, rootMargin: "0px 0px -30px 0px" });
-  $$(".reveal").forEach((el) => io.observe(el));
-
-  // se qualcosa va storto (observer non supportato, tab in background al caricamento),
-  // dopo 5 secondi mostriamo comunque tutto.
-  setTimeout(() => $$(".reveal").forEach((el) => { el.classList.add("in"); el.classList.remove("reveal"); }), 5000);
+  // rete di sicurezza: dopo 6 secondi tutto è visibile comunque
+  setTimeout(() => $$(".reveal").forEach((el) => { el.classList.add("in"); el.classList.remove("reveal"); }), 6000);
 
   /* ==========================================================
      13. PWA
@@ -1265,6 +1260,453 @@
     deferredPrompt = null;
     $("#installBtn").hidden = true;
   });
+
+  /* ==========================================================
+     14. NAVIGAZIONE A VISTE + MENU DELLE FUNZIONALITÀ
+     ========================================================== */
+  const SVG = (d, extra) =>
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+    'stroke-linecap="round" stroke-linejoin="round">' + d + (extra || "") + "</svg>";
+
+  const ICONS = {
+    pin:      SVG('<path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/>'),
+    chart:    SVG('<path d="M3 16.5 8 11l3.5 3.5L21 5"/><path d="M3 21h18"/>'),
+    calendar: SVG('<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
+    leaf:     SVG('<path d="M20 4C9 4 4 9.5 4 15.5A4.5 4.5 0 0 0 8.5 20C14.5 20 20 15 20 4Z"/><path d="M4 20 12 12"/>'),
+    sun:      SVG('<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/>'),
+    timer:    SVG('<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 1.8M9.5 2.5h5"/>'),
+    check:    SVG('<rect x="3" y="4" width="18" height="17" rx="3"/><path d="m7.8 12.6 2.7 2.7 5.7-5.7"/>'),
+    note:     SVG('<path d="M5 3.5h9.5L20 9v11.5H5Z"/><path d="M14 3.5V9h5.5M8.5 13h7M8.5 16.5h4.5"/>'),
+    euro:     SVG('<path d="M17.5 6.2A6.6 6.6 0 0 0 7 12a6.6 6.6 0 0 0 10.5 5.8"/><path d="M4.5 10.4h8M4.5 13.6h8"/>'),
+    ruler:    SVG('<rect x="2.5" y="8" width="19" height="8" rx="2" transform="rotate(-45 12 12)"/><path d="M9 7.5 10.5 9M12 10.5l1.5 1.5M15 13.5l1.5 1.5"/>'),
+    qr:       SVG('<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><path d="M14 14h2.5v2.5H14zM19 14h1.5M14 19h2.5M19 18v2.5"/>'),
+    video:    SVG('<rect x="2.5" y="5.5" width="13" height="13" rx="3"/><path d="m15.5 10.5 5.5-3v9l-5.5-3"/>'),
+    download: SVG('<path d="M12 3.5v11M7.8 10.5 12 14.7l4.2-4.2"/><path d="M4.5 17v2.5h15V17"/>'),
+    moon:     SVG('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>'),
+    search:   SVG('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>'),
+    refresh:  SVG('<path d="M20 11.5a8 8 0 1 1-2.6-5.4"/><path d="M20 3.5v5h-5"/>')
+  };
+
+  const FEATURES = [
+    { sep: "Meteo" },
+    { id: "meteo-now", ico: "pin",      t: "Meteo adesso",       s: "condizioni attuali e posizione",  view: "panoramica", card: "nowCard" },
+    { id: "meteo-24",  ico: "chart",    t: "Prossime 24 ore",    s: "temperatura e probabilità di pioggia", view: "meteo", card: "hourlyCard" },
+    { id: "meteo-7",   ico: "calendar", t: "Previsioni 7 giorni", s: "minime, massime e pioggia",      view: "meteo", card: "forecastCard" },
+    { id: "meteo-air", ico: "leaf",     t: "Qualità dell'aria",  s: "indice EAQI, PM2.5, PM10, ozono", view: "meteo", card: "airCard" },
+    { id: "meteo-sun", ico: "sun",      t: "Ciclo del sole",     s: "alba, tramonto, luce residua",    view: "meteo", card: "sunCard" },
+
+    { sep: "La tua giornata" },
+    { id: "focus", ico: "timer", t: "Focus timer",   s: "pomodoro da 25 o 50 minuti",   view: "giornata", card: "focusCard" },
+    { id: "task",  ico: "check", t: "Task di oggi",  s: "lista con barra di avanzamento", view: "giornata", card: "taskCard" },
+    { id: "note",  ico: "note",  t: "Blocco note",   s: "si salva mentre scrivi",        view: "giornata", card: "noteCard" },
+
+    { sep: "Strumenti" },
+    { id: "fx",    ico: "euro",     t: "Cambio valuta",     s: "31 valute ai tassi BCE",        view: "strumenti", card: "fxCard" },
+    { id: "conv",  ico: "ruler",    t: "Convertitore",      s: "lunghezza, peso, volume, dati", view: "strumenti", card: "convCard" },
+    { id: "qr",    ico: "qr",       t: "Generatore QR",     s: "link, testo, credenziali wifi", view: "strumenti", card: "qrCard" },
+    { id: "video", ico: "download", t: "Salva un video",    s: "da link diretto, con conferma", view: "video",     card: "videoCard" },
+
+    { sep: "Preferenze" },
+    { id: "theme",   ico: "moon",    t: "Cambia tema",      s: "chiaro o scuro",                 act: () => applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark") },
+    { id: "cmd",     ico: "search",  t: "Barra dei comandi", s: "calcola, converti, crea task",  act: () => setTimeout(openPalette, 60) },
+    { id: "refresh", ico: "refresh", t: "Aggiorna il meteo", s: "ricarica i dati live",          act: refreshWeather }
+  ];
+
+  const QUICK = ["meteo-24", "focus", "task", "video", "fx", "conv", "qr", "meteo-air"];
+  const VIEW_NAMES = ["panoramica", "meteo", "giornata", "strumenti", "video"];
+
+  function featureById(id) { return FEATURES.filter((f) => f.id === id)[0]; }
+
+  function openFeature(f) {
+    if (!f) return;
+    closeMenu();
+    if (f.act) { f.act(); return; }
+    showView(f.view, { card: f.card });
+  }
+
+  function flashCard(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.remove("card-flash");
+    void el.offsetWidth;
+    el.classList.add("card-flash");
+    setTimeout(() => el.classList.remove("card-flash"), 1700);
+  }
+
+  const tabsEl = $("#tabs");
+  function moveInk() {
+    const ink = $("#tabInk"), on = $(".tab.is-on", tabsEl);
+    if (!ink || !on || getComputedStyle(tabsEl).display === "none") return;
+    ink.style.width = on.offsetWidth + "px";
+    ink.style.transform = "translateX(" + on.offsetLeft + "px)";
+  }
+
+  let currentView = null;
+
+  function showView(name, opts) {
+    opts = opts || {};
+    if (VIEW_NAMES.indexOf(name) < 0) name = "panoramica";
+
+    const changed = currentView !== name;
+    if (changed) {
+      $$(".view").forEach((v) => v.classList.toggle("is-active", v.dataset.view === name));
+      $$(".tab", tabsEl).forEach((t) => t.classList.toggle("is-on", t.dataset.view === name));
+      $$("#bottombar button[data-view]").forEach((b) => b.classList.toggle("is-on", b.dataset.view === name));
+      currentView = name;
+      moveInk();
+
+      const view = $('.view[data-view="' + name + '"]');
+      if (view) revealIn(view);
+      if (name === "meteo" && state.weather) { renderHourly(state.weather); renderSun(state.weather); }
+
+      if (!opts.card) window.scrollTo({ top: 0, behavior: opts.instant ? "auto" : "smooth" });
+    }
+
+    if (opts.card) setTimeout(() => flashCard(opts.card), changed ? 240 : 60);
+
+    if (!opts.silent) {
+      const h = "#/" + name;
+      if (location.hash !== h) history.pushState(null, "", h);
+    }
+  }
+
+  function routeFromHash(instant) {
+    const raw = (location.hash || "").replace(/^#\/?/, "");
+    showView(raw || "panoramica", { silent: true, instant: !!instant });
+  }
+  addEventListener("popstate", () => routeFromHash(true));
+  addEventListener("hashchange", () => routeFromHash(true));
+  addEventListener("resize", moveInk, { passive: true });
+
+  tabsEl.addEventListener("click", (e) => {
+    const b = e.target.closest(".tab");
+    if (b) showView(b.dataset.view);
+  });
+  $("#bottombar").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-view]");
+    if (b) showView(b.dataset.view);
+  });
+
+  /* ---- menu launcher ---- */
+  const menuOverlay = $("#menuOverlay");
+
+  $("#menuGrid").innerHTML = FEATURES.map((f) =>
+    f.sep
+      ? '<p class="menu-sep">' + esc(f.sep) + "</p>"
+      : '<button class="menu-item" data-feat="' + f.id + '">' +
+        '<span class="m-ico">' + ICONS[f.ico] + "</span>" +
+        "<span><b>" + esc(f.t) + "</b><span>" + esc(f.s) + "</span></span></button>"
+  ).join("");
+
+  $("#quickGrid").innerHTML = QUICK.map((id) => {
+    const f = featureById(id);
+    if (!f) return "";
+    return '<button class="quick-item" data-feat="' + f.id + '">' +
+      '<span class="q-ico">' + ICONS[f.ico] + "</span>" +
+      "<span><b>" + esc(f.t) + "</b><span>" + esc(f.s) + "</span></span></button>";
+  }).join("");
+
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-feat]");
+    if (b) openFeature(featureById(b.dataset.feat));
+  });
+
+  function openMenu() {
+    menuOverlay.hidden = false;
+    setTimeout(() => { const f = $(".menu-item", menuOverlay); if (f) f.focus(); }, 60);
+  }
+  function closeMenu() { menuOverlay.hidden = true; }
+
+  $("#menuBtn").addEventListener("click", openMenu);
+  $("#bbMenu").addEventListener("click", openMenu);
+  $("#heroMenuBtn").addEventListener("click", openMenu);
+  $("#menuClose").addEventListener("click", closeMenu);
+  menuOverlay.addEventListener("click", (e) => { if (e.target === menuOverlay) closeMenu(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !menuOverlay.hidden) closeMenu();
+  });
+
+  $("#openPalette").addEventListener("click", closeMenu);
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") closeMenu();
+  });
+
+  routeFromHash(true);
+  if (!location.hash) history.replaceState(null, "", "#/panoramica");
+
+  /* ==========================================================
+     15. SALVA UN VIDEO
+     Scarica un file video da un link diretto, con anteprima,
+     conferma esplicita e barra di avanzamento. Tutto nel browser:
+     nessun server intermedio, il file va dritto sul dispositivo.
+     ========================================================== */
+  const vdUrl = $("#vdUrl"), vdStatusEl = $("#vdStatus"), vdResult = $("#vdResult"),
+        vdVideo = $("#vdVideo"), vdConfirm = $("#vdConfirm"), vdCancel = $("#vdCancel"),
+        vdOpen = $("#vdOpen"), vdProgress = $("#vdProgress"), vdBar = $("#vdBar"),
+        vdBarWrap = vdBar.parentElement, vdProgText = $("#vdProgText"), vdAnalyze = $("#vdAnalyze");
+
+  const VD = { url: null, name: "video.mp4", type: null, size: null, abort: null };
+
+  const PLATFORMS = [
+    ["youtube.com", "YouTube"], ["youtu.be", "YouTube"], ["instagram.com", "Instagram"],
+    ["tiktok.com", "TikTok"], ["facebook.com", "Facebook"], ["fb.watch", "Facebook"],
+    ["x.com", "X"], ["twitter.com", "X"], ["vimeo.com", "Vimeo"],
+    ["dailymotion.com", "Dailymotion"], ["twitch.tv", "Twitch"], ["reddit.com", "Reddit"]
+  ];
+
+  function fmtBytes(n) {
+    if (!n && n !== 0) return "sconosciuta";
+    const u = ["B", "KB", "MB", "GB"];
+    let i = 0, v = n;
+    while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+    return (i === 0 ? v : v.toFixed(v < 10 ? 2 : 1)) + " " + u[i];
+  }
+  function fmtDur(s) {
+    if (!isFinite(s) || s <= 0) return "—";
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = Math.floor(s % 60);
+    return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(x).padStart(2, "0");
+  }
+
+  function vdSay(kind, html) {
+    vdStatusEl.hidden = false;
+    vdStatusEl.className = "vd-status is-" + kind;
+    vdStatusEl.innerHTML = html;
+  }
+  function vdHide() { vdStatusEl.hidden = true; }
+
+  function vdFileName(u, disp) {
+    if (disp) {
+      const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disp);
+      if (m) { try { return decodeURIComponent(m[1]); } catch (e) { return m[1]; } }
+    }
+    let base = "";
+    try { base = decodeURIComponent((u.pathname.split("/").filter(Boolean).pop() || "")); } catch (e) { base = ""; }
+    base = base.replace(/[\\/:*?"<>|]/g, "_").slice(0, 120);
+    if (!/\.[a-z0-9]{2,5}$/i.test(base)) base = (base || "video") + ".mp4";
+    return base;
+  }
+
+  async function vdProbe(href) {
+    try {
+      const r = await fetch(href, { method: "HEAD" });
+      if (r.ok) return {
+        ok: true, type: r.headers.get("content-type"),
+        size: Number(r.headers.get("content-length")) || null,
+        disp: r.headers.get("content-disposition")
+      };
+    } catch (e) { /* proviamo con GET */ }
+
+    // GET "semplice": nessun header personalizzato, quindi nessun preflight CORS
+    // (un header Range farebbe scattare una OPTIONS che molti server statici rifiutano).
+    // Leggiamo solo gli header e chiudiamo subito lo stream, senza scaricare il file.
+    try {
+      const r = await fetch(href, { method: "GET" });
+      let size = null;
+      const cr = r.headers.get("content-range");
+      if (cr) { const m = /\/(\d+)\s*$/.exec(cr); if (m) size = Number(m[1]); }
+      if (!size) size = Number(r.headers.get("content-length")) || null;
+      const out = r.ok
+        ? { ok: true, type: r.headers.get("content-type"), size: size, disp: r.headers.get("content-disposition") }
+        : { ok: false, status: r.status };
+      try { if (r.body) await r.body.cancel(); } catch (e) {}
+      return out;
+    } catch (e) {
+      return { ok: false, blocked: true };
+    }
+  }
+
+  async function vdAnalyzeUrl(raw) {
+    let u;
+    try { u = new URL(String(raw || "").trim()); }
+    catch (e) { vdResult.hidden = true; return vdSay("error", "<b>Indirizzo non valido.</b><p>Deve iniziare con <code>https://</code> e puntare a un file video.</p>"); }
+
+    if (u.protocol !== "http:" && u.protocol !== "https:") {
+      vdResult.hidden = true;
+      return vdSay("error", "<b>Protocollo non ammesso.</b><p>Sono supportati solo <code>http</code> e <code>https</code>.</p>");
+    }
+
+    const host = u.hostname.replace(/^www\./, "");
+    const plat = PLATFORMS.filter((p) => host === p[0] || host.slice(-(p[0].length + 1)) === "." + p[0])[0];
+    if (plat) {
+      vdResult.hidden = true;
+      return vdSay("warn",
+        "<b>" + esc(plat[1]) + " non è supportato.</b>" +
+        "<p>Questo è l'indirizzo di una pagina, non di un file video. Per estrarre il flusso servirebbe un server dedicato, e i termini di servizio di " + esc(plat[1]) + " non lo consentono.</p>" +
+        "<p>Funziona invece qualsiasi <b>link diretto</b> a un file: un indirizzo che finisce in <code>.mp4</code>, <code>.webm</code> o simili.</p>");
+    }
+
+    if (/\.(m3u8|mpd)($|[?#])/i.test(u.pathname)) {
+      vdResult.hidden = true;
+      return vdSay("warn",
+        "<b>Questo è un manifesto di streaming</b> (HLS o DASH)." +
+        "<p>Il video è spezzato in centinaia di segmenti da ricomporre: una pagina statica non può farlo. Serve il link al file completo.</p>");
+    }
+
+    vdAnalyze.disabled = true;
+    vdSay("busy", "Sto controllando il file…");
+    const info = await vdProbe(u.href);
+    vdAnalyze.disabled = false;
+
+    VD.url = u.href;
+    VD.type = info.type || null;
+    VD.size = info.size || null;
+    VD.name = vdFileName(u, info.disp);
+
+    if (info.ok && info.type && /^text\/html/i.test(info.type)) {
+      vdResult.hidden = true;
+      return vdSay("error",
+        "<b>Questo indirizzo restituisce una pagina web, non un video.</b>" +
+        "<p>Apri la pagina, fai clic destro sul video e copia l'indirizzo del file: deve finire in <code>.mp4</code> o simili.</p>");
+    }
+
+    // Lettura bloccata o rifiutata: mostriamo comunque anteprima e vie d'uscita,
+    // perche il tag video non e soggetto al CORS e spesso funziona lo stesso.
+    if (!info.ok) {
+      vdSay("warn",
+        "<b>Questo server non lascia che un altro sito legga il file.</b>" +
+        "<p>" + (info.status ? "Ha risposto <code>" + info.status + "</code> alla richiesta di Aurora. " : "") +
+        "È la restrizione CORS, e vale per qualunque sito, non solo per questo.</p>" +
+        "<p>Se vedi l'anteprima qui sotto, il video esiste: usa <b>Apri in una scheda</b> e salvalo dal browser " +
+        "(clic destro sul video &rsaquo; <i>Salva video con nome</i>). Puoi anche provare il download qui: a volte passa.</p>");
+    } else if (info.type && !/^(video\/|application\/octet-stream)/i.test(info.type)) {
+      vdSay("warn", "<b>Tipo di file inatteso:</b> <code>" + esc(info.type) + "</code>. Puoi provare comunque a scaricarlo.");
+    } else {
+      vdSay("ok", "<b>File trovato.</b> Controlla l'anteprima, poi conferma il salvataggio.");
+    }
+
+    $("#vdName").textContent = VD.name;
+    $("#vdType").textContent = VD.type || "sconosciuto";
+    $("#vdSize").textContent = fmtBytes(VD.size);
+    $("#vdDur").textContent = "…";
+
+    vdOpen.href = VD.url;
+    vdOpen.hidden = false;
+    vdOpen.textContent = "Apri in una scheda";
+    vdProgress.hidden = true;
+    vdConfirm.disabled = false;
+    vdConfirm.textContent = "Scarica sul dispositivo";
+    vdResult.hidden = false;
+
+    vdVideo.src = VD.url;
+    vdVideo.onloadedmetadata = () => {
+      $("#vdDur").textContent = fmtDur(vdVideo.duration) +
+        (vdVideo.videoWidth ? "  ·  " + vdVideo.videoWidth + "×" + vdVideo.videoHeight : "");
+    };
+    vdVideo.onerror = () => { $("#vdDur").textContent = "anteprima non disponibile"; };
+  }
+
+  $("#vdForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    vdAnalyzeUrl(vdUrl.value);
+  });
+
+  function vdSetProgress(received, total) {
+    vdProgress.hidden = false;
+    if (total) {
+      vdBarWrap.classList.remove("is-indeterminate");
+      const pct = Math.min(100, (received / total) * 100);
+      vdBar.style.width = pct.toFixed(1) + "%";
+      vdProgText.textContent = fmtBytes(received) + " di " + fmtBytes(total) + "  ·  " + pct.toFixed(0) + "%";
+    } else {
+      vdBarWrap.classList.add("is-indeterminate");
+      vdProgText.textContent = "Scaricati " + fmtBytes(received) + "…";
+    }
+  }
+
+  function vdBusy(on) {
+    vdConfirm.disabled = on;
+    vdConfirm.textContent = on ? "Scaricamento…" : "Scarica sul dispositivo";
+    vdCancel.hidden = !on;
+    vdAnalyze.disabled = on;
+    vdUrl.disabled = on;
+  }
+
+  vdConfirm.addEventListener("click", async () => {
+    if (!VD.url) return;
+
+    // Il selettore di file va aperto subito, finché il clic è ancora "fresco".
+    let writable = null;
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({ suggestedName: VD.name });
+        writable = await handle.createWritable();
+      } catch (e) {
+        if (e && e.name === "AbortError") return;   // l'utente ha annullato
+        writable = null;                            // niente API: si va di blob
+      }
+    }
+
+    VD.abort = new AbortController();
+    vdBusy(true);
+    vdSay("busy", "Sto scaricando il video sul tuo dispositivo…");
+    vdSetProgress(0, VD.size);
+
+    try {
+      const res = await fetch(VD.url, { signal: VD.abort.signal });
+      if (!res.ok) throw new Error("il server ha risposto " + res.status);
+
+      const total = Number(res.headers.get("content-length")) || VD.size || 0;
+
+      if (!res.body || !res.body.getReader) {
+        // browser senza stream: si scarica tutto in memoria
+        const blob = await res.blob();
+        if (writable) { await writable.write(blob); await writable.close(); }
+        else vdSaveBlob(blob);
+      } else {
+        const reader = res.body.getReader();
+        const chunks = [];
+        let received = 0;
+        for (;;) {
+          const step = await reader.read();
+          if (step.done) break;
+          received += step.value.length;
+          if (writable) await writable.write(step.value);
+          else chunks.push(step.value);
+          vdSetProgress(received, total);
+        }
+        if (writable) await writable.close();
+        else vdSaveBlob(new Blob(chunks, { type: VD.type || "video/mp4" }));
+      }
+
+      vdBar.style.width = "100%";
+      vdBarWrap.classList.remove("is-indeterminate");
+      vdProgText.textContent = "Completato";
+      vdSay("ok", writable
+        ? "<b>Salvato.</b><p>Trovi <code>" + esc(VD.name) + "</code> nella cartella che hai scelto.</p>"
+        : "<b>Scaricato.</b><p>Trovi <code>" + esc(VD.name) + "</code> tra i download del browser.</p>");
+      toast("Video salvato.");
+
+    } catch (err) {
+      if (writable) { try { await writable.abort(); } catch (e) {} }
+      vdProgress.hidden = true;
+      if (err && err.name === "AbortError") {
+        vdSay("warn", "<b>Download annullato.</b>");
+      } else {
+        vdSay("error",
+          "<b>Non sono riuscito a scaricarlo.</b>" +
+          "<p>" + esc(err && err.message ? err.message : "errore sconosciuto") + "</p>" +
+          "<p>Se il video si vede nell'anteprima ma il download fallisce, il server che lo ospita non permette ad altri siti di leggerne i byte (CORS). In quel caso usa <b>Apri in una scheda</b> e salvalo dal browser.</p>");
+      }
+    } finally {
+      VD.abort = null;
+      vdBusy(false);
+    }
+  });
+
+  function vdSaveBlob(blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = VD.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  vdCancel.addEventListener("click", () => { if (VD.abort) VD.abort.abort(); });
+
 
   // aggiorna il ciclo del sole ogni minuto
   setInterval(() => { if (state.weather) renderSun(state.weather); }, 60000);

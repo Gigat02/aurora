@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Aurora — la tua giornata, in un colpo d'occhio</title>
-<meta name="description" content="Aurora è un cruscotto quotidiano: meteo live, qualità dell'aria, ciclo del sole, focus timer, task, note, convertitore valute e unità, generatore QR. Tutto in una pagina, anche offline.">
+<meta name="description" content="Aurora è un cruscotto quotidiano: meteo live, qualità dell'aria, ciclo del sole, focus timer, task, note, convertitore valute e unità, generatore QR e salvataggio video. Tutto in una pagina, anche offline.">
 <meta name="theme-color" content="#05060f">
 <meta property="og:title" content="Aurora — la tua giornata, in un colpo d'occhio">
 <meta property="og:description" content="Meteo live, focus timer, task, note e strumenti quotidiani in un'unica dashboard.">
@@ -24,18 +24,25 @@
 <div class="spotlight" aria-hidden="true"></div>
 
 <header class="topbar">
-  <a class="brand" href="#top">
+  <a class="brand" href="#/panoramica">
     <span class="brand-mark" aria-hidden="true">
       <svg viewBox="0 0 32 32" fill="none"><path d="M16 3c3.4 5.2 8 8.6 8 13.4A8 8 0 0 1 8 16.4C8 11.6 12.6 8.2 16 3Z" stroke="url(#bg1)" stroke-width="2" stroke-linejoin="round"/><circle cx="16" cy="18" r="3.2" fill="url(#bg1)"/><defs><linearGradient id="bg1" x1="8" y1="3" x2="26" y2="27"><stop stop-color="#8b7bff"/><stop offset=".5" stop-color="#22d3ee"/><stop offset="1" stop-color="#ff6bab"/></linearGradient></defs></svg>
     </span>
     <span class="brand-text">Aurora</span>
   </a>
 
-  <nav class="tabs" aria-label="Sezioni">
-    <button class="tab" data-goto="deck-meteo">Meteo</button>
-    <button class="tab" data-goto="deck-focus">Focus</button>
-    <button class="tab" data-goto="deck-task">Task</button>
-    <button class="tab" data-goto="deck-tools">Strumenti</button>
+  <button class="menu-btn" id="menuBtn" aria-haspopup="dialog">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="7.4" height="7.4" rx="2.2"/><rect x="13.6" y="3" width="7.4" height="7.4" rx="2.2"/><rect x="3" y="13.6" width="7.4" height="7.4" rx="2.2"/><rect x="13.6" y="13.6" width="7.4" height="7.4" rx="2.2"/></svg>
+    <span>Menu</span>
+  </button>
+
+  <nav class="tabs" id="tabs" aria-label="Sezioni">
+    <button class="tab" data-view="panoramica">Panoramica</button>
+    <button class="tab" data-view="meteo">Meteo</button>
+    <button class="tab" data-view="giornata">Giornata</button>
+    <button class="tab" data-view="strumenti">Strumenti</button>
+    <button class="tab" data-view="video">Video</button>
+    <i class="tab-ink" id="tabInk" aria-hidden="true"></i>
   </nav>
 
   <div class="topbar-actions">
@@ -53,206 +60,320 @@
 
 <main id="top">
 
-  <section class="hero reveal">
-    <div class="hero-copy">
-      <p class="eyebrow"><span class="live-dot"></span><span id="heroDate">—</span></p>
-      <h1 class="clock"><span id="clock">--:--</span><span class="clock-sec" id="clockSec">00</span></h1>
-      <p class="greeting" id="greeting">Buongiorno.</p>
-      <p class="sub" id="heroSub">Sto leggendo il meteo della tua zona…</p>
-      <div class="hero-chips">
-        <button class="chip" data-goto="deck-focus">Inizia una sessione focus</button>
-        <button class="chip ghost" id="installBtn" hidden>Installa Aurora</button>
+  <!-- ============ PANORAMICA ============ -->
+  <section class="view is-active" data-view="panoramica">
+    <div class="hero reveal">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="live-dot"></span><span id="heroDate">—</span></p>
+        <h1 class="clock"><span id="clock">--:--</span><span class="clock-sec" id="clockSec">00</span></h1>
+        <p class="greeting" id="greeting">Buongiorno.</p>
+        <p class="sub" id="heroSub">Sto leggendo il meteo della tua zona…</p>
+        <div class="hero-chips">
+          <button class="chip" id="heroMenuBtn">Apri il menu</button>
+          <button class="chip ghost" id="installBtn" hidden>Installa Aurora</button>
+        </div>
       </div>
+
+      <article class="glass now-card" id="nowCard">
+        <div class="now-head">
+          <div>
+            <p class="label">Adesso</p>
+            <h2 class="place" id="place">Rilevo posizione…</h2>
+          </div>
+          <button class="icon-btn sm" id="searchCityBtn" title="Cambia città" aria-label="Cambia città">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg>
+          </button>
+        </div>
+
+        <div class="now-body">
+          <div class="now-icon" id="nowIcon"></div>
+          <div class="now-temp"><span id="nowTemp">--</span><sup>°</sup></div>
+        </div>
+        <p class="now-desc" id="nowDesc">Caricamento…</p>
+
+        <div class="now-stats">
+          <div class="stat"><span class="stat-k">Percepita</span><span class="stat-v" id="sApparent">—</span></div>
+          <div class="stat"><span class="stat-k">Umidità</span><span class="stat-v" id="sHum">—</span></div>
+          <div class="stat"><span class="stat-k">Vento</span><span class="stat-v" id="sWind">—</span></div>
+          <div class="stat"><span class="stat-k">Pioggia</span><span class="stat-v" id="sRain">—</span></div>
+        </div>
+
+        <div class="city-search" id="citySearch" hidden>
+          <input type="text" id="cityInput" placeholder="Cerca una città…" autocomplete="off" spellcheck="false">
+          <ul class="city-results" id="cityResults"></ul>
+        </div>
+      </article>
     </div>
 
-    <article class="glass now-card" id="nowCard">
-      <div class="now-head">
-        <div>
-          <p class="label">Adesso</p>
-          <h2 class="place" id="place">Rilevo posizione…</h2>
-        </div>
-        <button class="icon-btn sm" id="searchCityBtn" title="Cambia città" aria-label="Cambia città">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg>
-        </button>
-      </div>
-
-      <div class="now-body">
-        <div class="now-icon" id="nowIcon"></div>
-        <div class="now-temp"><span id="nowTemp">--</span><sup>°</sup></div>
-      </div>
-      <p class="now-desc" id="nowDesc">Caricamento…</p>
-
-      <div class="now-stats">
-        <div class="stat"><span class="stat-k">Percepita</span><span class="stat-v" id="sApparent">—</span></div>
-        <div class="stat"><span class="stat-k">Umidità</span><span class="stat-v" id="sHum">—</span></div>
-        <div class="stat"><span class="stat-k">Vento</span><span class="stat-v" id="sWind">—</span></div>
-        <div class="stat"><span class="stat-k">Pioggia</span><span class="stat-v" id="sRain">—</span></div>
-      </div>
-
-      <div class="city-search" id="citySearch" hidden>
-        <input type="text" id="cityInput" placeholder="Cerca una città…" autocomplete="off" spellcheck="false">
-        <ul class="city-results" id="cityResults"></ul>
-      </div>
-    </article>
+    <header class="view-head reveal">
+      <h2>Accesso rapido</h2>
+      <p>Tutto quello che c'è dentro, a un clic. Oppure premi <kbd>Ctrl</kbd><kbd>K</kbd>.</p>
+    </header>
+    <div class="quick-grid reveal" id="quickGrid"></div>
   </section>
 
-  <h2 class="section-title reveal" id="deck-meteo"><span>01</span> Il tuo cielo</h2>
-  <section class="bento bento-meteo">
+  <!-- ============ METEO ============ -->
+  <section class="view" data-view="meteo">
+    <header class="view-head reveal">
+      <h2>Il tuo cielo</h2>
+      <p>Previsioni, aria e luce per <b id="meteoPlace">la tua zona</b>.</p>
+    </header>
 
-    <article class="glass span-2 reveal" id="hourlyCard">
-      <header class="card-head">
-        <h3>Prossime 24 ore</h3>
-        <p class="card-sub" id="hourlySub">temperatura e probabilità di pioggia</p>
-      </header>
-      <div class="chart-wrap"><svg id="hourlyChart" viewBox="0 0 720 230"></svg></div>
-      <div class="hourly-legend">
-        <span><i class="sw sw-temp"></i>Temperatura</span>
-        <span><i class="sw sw-rain"></i>Probabilità pioggia</span>
-      </div>
-    </article>
-
-    <article class="glass reveal" id="sunCard">
-      <header class="card-head"><h3>Ciclo del sole</h3></header>
-      <div class="sun-wrap">
-        <svg viewBox="0 0 240 135" class="sun-svg">
-          <defs>
-            <linearGradient id="sunGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0" stop-color="#ff9d5c"/><stop offset=".5" stop-color="#ffd76b"/><stop offset="1" stop-color="#ff7ab0"/>
-            </linearGradient>
-          </defs>
-          <path d="M20 118 A100 100 0 0 1 220 118" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="2" stroke-dasharray="4 6"/>
-          <path id="sunProgress" d="M20 118 A100 100 0 0 1 220 118" fill="none" stroke="url(#sunGrad)" stroke-width="3" stroke-linecap="round"/>
-          <circle id="sunDot" cx="20" cy="118" r="7" fill="#ffd76b"/>
-        </svg>
-      </div>
-      <div class="sun-times">
-        <div><span class="stat-k">Alba</span><span class="stat-v" id="sunrise">—</span></div>
-        <div class="sun-mid"><span class="stat-k" id="sunMidLabel">Luce residua</span><span class="stat-v" id="daylightLeft">—</span></div>
-        <div><span class="stat-k">Tramonto</span><span class="stat-v" id="sunset">—</span></div>
-      </div>
-    </article>
-
-    <article class="glass reveal" id="airCard">
-      <header class="card-head"><h3>Qualità dell'aria</h3></header>
-      <div class="aqi">
-        <div class="aqi-ring">
-          <svg viewBox="0 0 120 120">
-            <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="9"/>
-            <circle id="aqiArc" cx="60" cy="60" r="50" fill="none" stroke="#4ade80" stroke-width="9" stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="314" transform="rotate(-90 60 60)"/>
-          </svg>
-          <div class="aqi-num"><span id="aqiValue">—</span></div>
+    <div class="bento bento-meteo">
+      <article class="glass span-2 reveal" id="hourlyCard">
+        <header class="card-head">
+          <h3>Prossime 24 ore</h3>
+          <p class="card-sub" id="hourlySub">temperatura e probabilità di pioggia</p>
+        </header>
+        <div class="chart-wrap"><svg id="hourlyChart" viewBox="0 0 720 230"></svg></div>
+        <div class="hourly-legend">
+          <span><i class="sw sw-temp"></i>Temperatura</span>
+          <span><i class="sw sw-rain"></i>Probabilità pioggia</span>
         </div>
-        <div class="aqi-info">
-          <p class="aqi-label" id="aqiLabel">In caricamento</p>
-          <p class="aqi-note" id="aqiNote">Indice europeo EAQI</p>
-          <div class="aqi-bars">
-            <div><span>PM2.5</span><b id="pm25">—</b></div>
-            <div><span>PM10</span><b id="pm10">—</b></div>
-            <div><span>O3</span><b id="o3">—</b></div>
+      </article>
+
+      <article class="glass reveal" id="sunCard">
+        <header class="card-head"><h3>Ciclo del sole</h3></header>
+        <div class="sun-wrap">
+          <svg viewBox="0 0 240 135" class="sun-svg">
+            <defs>
+              <linearGradient id="sunGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#ff9d5c"/><stop offset=".5" stop-color="#ffd76b"/><stop offset="1" stop-color="#ff7ab0"/>
+              </linearGradient>
+            </defs>
+            <path d="M20 118 A100 100 0 0 1 220 118" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="2" stroke-dasharray="4 6"/>
+            <path id="sunProgress" d="M20 118 A100 100 0 0 1 220 118" fill="none" stroke="url(#sunGrad)" stroke-width="3" stroke-linecap="round"/>
+            <circle id="sunDot" cx="20" cy="118" r="7" fill="#ffd76b"/>
+          </svg>
+        </div>
+        <div class="sun-times">
+          <div><span class="stat-k">Alba</span><span class="stat-v" id="sunrise">—</span></div>
+          <div class="sun-mid"><span class="stat-k" id="sunMidLabel">Luce residua</span><span class="stat-v" id="daylightLeft">—</span></div>
+          <div><span class="stat-k">Tramonto</span><span class="stat-v" id="sunset">—</span></div>
+        </div>
+      </article>
+
+      <article class="glass reveal" id="airCard">
+        <header class="card-head"><h3>Qualità dell'aria</h3></header>
+        <div class="aqi">
+          <div class="aqi-ring">
+            <svg viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="9"/>
+              <circle id="aqiArc" cx="60" cy="60" r="50" fill="none" stroke="#4ade80" stroke-width="9" stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="314" transform="rotate(-90 60 60)"/>
+            </svg>
+            <div class="aqi-num"><span id="aqiValue">—</span></div>
+          </div>
+          <div class="aqi-info">
+            <p class="aqi-label" id="aqiLabel">In caricamento</p>
+            <p class="aqi-note" id="aqiNote">Indice europeo EAQI</p>
+            <div class="aqi-bars">
+              <div><span>PM2.5</span><b id="pm25">—</b></div>
+              <div><span>PM10</span><b id="pm10">—</b></div>
+              <div><span>O3</span><b id="o3">—</b></div>
+            </div>
           </div>
         </div>
-      </div>
-    </article>
+      </article>
 
-    <article class="glass span-4 reveal" id="forecastCard">
-      <header class="card-head"><h3>7 giorni</h3><p class="card-sub">min / max e probabilità di pioggia</p></header>
-      <div class="days" id="days"></div>
-    </article>
+      <article class="glass span-4 reveal" id="forecastCard">
+        <header class="card-head"><h3>7 giorni</h3><p class="card-sub">min / max e probabilità di pioggia</p></header>
+        <div class="days" id="days"></div>
+      </article>
+    </div>
   </section>
 
-  <h2 class="section-title reveal" id="deck-focus"><span>02</span> La tua giornata</h2>
-  <section class="bento bento-day">
+  <!-- ============ GIORNATA ============ -->
+  <section class="view" data-view="giornata">
+    <header class="view-head reveal">
+      <h2>La tua giornata</h2>
+      <p>Concentrazione, cose da fare e pensieri sparsi. Tutto resta sul tuo dispositivo.</p>
+    </header>
 
-    <article class="glass reveal focus-card">
-      <header class="card-head"><h3>Focus timer</h3><p class="card-sub" id="focusPhase">Pomodoro · 25 min</p></header>
-      <div class="focus-ring">
-        <svg viewBox="0 0 200 200">
-          <defs><linearGradient id="focusGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7bff"/><stop offset=".5" stop-color="#22d3ee"/><stop offset="1" stop-color="#ff6bab"/></linearGradient></defs>
-          <circle cx="100" cy="100" r="86" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="10"/>
-          <circle id="focusArc" cx="100" cy="100" r="86" fill="none" stroke="url(#focusGrad)" stroke-width="10" stroke-linecap="round" stroke-dasharray="540.35" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
-        </svg>
-        <div class="focus-time" id="focusTime">25:00</div>
-      </div>
-      <div class="focus-modes" id="focusModes">
-        <button class="pill is-on" data-min="25">25 min</button>
-        <button class="pill" data-min="50">50 min</button>
-        <button class="pill" data-min="5">Pausa 5</button>
-      </div>
-      <div class="focus-controls">
-        <button class="btn primary" id="focusToggle">Avvia</button>
-        <button class="btn" id="focusReset">Reset</button>
-      </div>
-      <p class="focus-count">Sessioni completate oggi: <b id="focusDone">0</b></p>
-    </article>
+    <div class="bento bento-day">
+      <article class="glass reveal focus-card" id="focusCard">
+        <header class="card-head"><h3>Focus timer</h3><p class="card-sub" id="focusPhase">Pomodoro · 25 min</p></header>
+        <div class="focus-ring">
+          <svg viewBox="0 0 200 200">
+            <defs><linearGradient id="focusGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7bff"/><stop offset=".5" stop-color="#22d3ee"/><stop offset="1" stop-color="#ff6bab"/></linearGradient></defs>
+            <circle cx="100" cy="100" r="86" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="10"/>
+            <circle id="focusArc" cx="100" cy="100" r="86" fill="none" stroke="url(#focusGrad)" stroke-width="10" stroke-linecap="round" stroke-dasharray="540.35" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+          </svg>
+          <div class="focus-time" id="focusTime">25:00</div>
+        </div>
+        <div class="focus-modes" id="focusModes">
+          <button class="pill is-on" data-min="25">25 min</button>
+          <button class="pill" data-min="50">50 min</button>
+          <button class="pill" data-min="5">Pausa 5</button>
+        </div>
+        <div class="focus-controls">
+          <button class="btn primary" id="focusToggle">Avvia</button>
+          <button class="btn" id="focusReset">Reset</button>
+        </div>
+        <p class="focus-count">Sessioni completate oggi: <b id="focusDone">0</b></p>
+      </article>
 
-    <article class="glass span-2 reveal task-card" id="deck-task">
-      <header class="card-head">
-        <h3>Task di oggi</h3>
-        <p class="card-sub"><span id="taskDoneN">0</span>/<span id="taskTotN">0</span> completati</p>
-      </header>
-      <div class="task-progress"><i id="taskBar"></i></div>
-      <form class="task-add" id="taskForm">
-        <input id="taskInput" type="text" placeholder="Cosa devi fare oggi?" autocomplete="off" maxlength="160">
-        <button class="btn primary sm" type="submit">Aggiungi</button>
-      </form>
-      <ul class="tasks" id="tasks"></ul>
-      <p class="empty" id="taskEmpty">Nessun task. Aggiungine uno e la barra si accende.</p>
-    </article>
+      <article class="glass span-2 reveal task-card" id="taskCard">
+        <header class="card-head">
+          <h3>Task di oggi</h3>
+          <p class="card-sub"><span id="taskDoneN">0</span>/<span id="taskTotN">0</span> completati</p>
+        </header>
+        <div class="task-progress"><i id="taskBar"></i></div>
+        <form class="task-add" id="taskForm">
+          <input id="taskInput" type="text" placeholder="Cosa devi fare oggi?" autocomplete="off" maxlength="160">
+          <button class="btn primary sm" type="submit">Aggiungi</button>
+        </form>
+        <ul class="tasks" id="tasks"></ul>
+        <p class="empty" id="taskEmpty">Nessun task. Aggiungine uno e la barra si accende.</p>
+      </article>
 
-    <article class="glass reveal note-card">
-      <header class="card-head"><h3>Blocco note</h3><p class="card-sub" id="noteStatus">salvato sul tuo dispositivo</p></header>
-      <textarea id="note" placeholder="Idee, numeri, la lista della spesa… si salva da solo mentre scrivi."></textarea>
-    </article>
+      <article class="glass reveal note-card" id="noteCard">
+        <header class="card-head"><h3>Blocco note</h3><p class="card-sub" id="noteStatus">salvato sul tuo dispositivo</p></header>
+        <textarea id="note" placeholder="Idee, numeri, la lista della spesa… si salva da solo mentre scrivi."></textarea>
+      </article>
+    </div>
   </section>
 
-  <h2 class="section-title reveal" id="deck-tools"><span>03</span> Strumenti che usi davvero</h2>
-  <section class="bento bento-tools">
+  <!-- ============ STRUMENTI ============ -->
+  <section class="view" data-view="strumenti">
+    <header class="view-head reveal">
+      <h2>Strumenti che usi davvero</h2>
+      <p>Cambi, conversioni e codici QR, senza cercare un sito ogni volta.</p>
+    </header>
 
-    <article class="glass reveal">
-      <header class="card-head"><h3>Cambio valuta</h3><p class="card-sub" id="fxDate">tassi BCE</p></header>
-      <div class="fx">
-        <div class="fx-row">
-          <input type="number" id="fxAmount" value="100" min="0" step="any" inputmode="decimal">
-          <select id="fxFrom" aria-label="Valuta di partenza"></select>
+    <div class="bento bento-tools">
+      <article class="glass reveal" id="fxCard">
+        <header class="card-head"><h3>Cambio valuta</h3><p class="card-sub" id="fxDate">tassi BCE</p></header>
+        <div class="fx">
+          <div class="fx-row">
+            <input type="number" id="fxAmount" value="100" min="0" step="any" inputmode="decimal">
+            <select id="fxFrom" aria-label="Valuta di partenza"></select>
+          </div>
+          <button class="fx-swap" id="fxSwap" title="Inverti" aria-label="Inverti valute">&#8645;</button>
+          <div class="fx-row">
+            <input type="text" id="fxResult" readonly value="—">
+            <select id="fxTo" aria-label="Valuta di arrivo"></select>
+          </div>
         </div>
-        <button class="fx-swap" id="fxSwap" title="Inverti" aria-label="Inverti valute">&#8645;</button>
-        <div class="fx-row">
-          <input type="text" id="fxResult" readonly value="—">
-          <select id="fxTo" aria-label="Valuta di arrivo"></select>
-        </div>
-      </div>
-      <p class="fx-rate" id="fxRate">—</p>
-    </article>
+        <p class="fx-rate" id="fxRate">—</p>
+      </article>
 
-    <article class="glass reveal">
-      <header class="card-head"><h3>Convertitore</h3><p class="card-sub">lunghezza, peso, volume, temperatura, dati, velocità</p></header>
-      <div class="conv">
-        <select id="convCat" aria-label="Categoria"></select>
-        <div class="conv-row">
-          <input type="number" id="convA" value="1" step="any" inputmode="decimal">
-          <select id="convFrom" aria-label="Unità di partenza"></select>
+      <article class="glass reveal" id="convCard">
+        <header class="card-head"><h3>Convertitore</h3><p class="card-sub">lunghezza, peso, volume, temperatura, dati, velocità</p></header>
+        <div class="conv">
+          <select id="convCat" aria-label="Categoria"></select>
+          <div class="conv-row">
+            <input type="number" id="convA" value="1" step="any" inputmode="decimal">
+            <select id="convFrom" aria-label="Unità di partenza"></select>
+          </div>
+          <div class="conv-row">
+            <input type="text" id="convB" readonly value="—">
+            <select id="convTo" aria-label="Unità di arrivo"></select>
+          </div>
         </div>
-        <div class="conv-row">
-          <input type="text" id="convB" readonly value="—">
-          <select id="convTo" aria-label="Unità di arrivo"></select>
-        </div>
-      </div>
-    </article>
+      </article>
 
-    <article class="glass reveal qr-card">
-      <header class="card-head"><h3>Generatore QR</h3><p class="card-sub">link, testo, wifi — scaricabile</p></header>
-      <input type="text" id="qrText" placeholder="https://… oppure qualsiasi testo" value="https://github.com">
-      <div class="qr-box"><canvas id="qrCanvas" width="250" height="250"></canvas></div>
-      <button class="btn sm" id="qrDownload">Scarica PNG</button>
-    </article>
+      <article class="glass reveal qr-card" id="qrCard">
+        <header class="card-head"><h3>Generatore QR</h3><p class="card-sub">link, testo, wifi — scaricabile</p></header>
+        <input type="text" id="qrText" placeholder="https://… oppure qualsiasi testo" value="https://github.com">
+        <div class="qr-box"><canvas id="qrCanvas" width="250" height="250"></canvas></div>
+        <button class="btn sm" id="qrDownload">Scarica PNG</button>
+      </article>
+    </div>
   </section>
 
-  <footer class="foot reveal">
+  <!-- ============ VIDEO ============ -->
+  <section class="view" data-view="video">
+    <header class="view-head reveal">
+      <h2>Salva un video</h2>
+      <p>Incolla il link diretto a un file video, controlla l'anteprima e conferma il salvataggio.</p>
+    </header>
+
+    <div class="bento bento-video">
+      <article class="glass span-2 reveal" id="videoCard">
+        <header class="card-head">
+          <h3>Link del video</h3>
+          <p class="card-sub">.mp4 · .webm · .ogg · .mov · .m4v · .mkv</p>
+        </header>
+
+        <form class="vd-form" id="vdForm">
+          <input type="url" id="vdUrl" placeholder="https://esempio.com/video.mp4" autocomplete="off" spellcheck="false">
+          <button class="btn primary" type="submit" id="vdAnalyze">Analizza</button>
+        </form>
+
+        <p class="vd-hint" id="vdHint">Il file viene scaricato dal tuo browser direttamente sul tuo dispositivo: non passa da nessun server di Aurora.</p>
+
+        <div class="vd-status" id="vdStatus" hidden></div>
+
+        <div class="vd-result" id="vdResult" hidden>
+          <div class="vd-preview">
+            <video id="vdVideo" controls preload="metadata" playsinline></video>
+          </div>
+          <div class="vd-meta">
+            <div class="vd-meta-row"><span>Nome file</span><b id="vdName">—</b></div>
+            <div class="vd-meta-row"><span>Tipo</span><b id="vdType">—</b></div>
+            <div class="vd-meta-row"><span>Dimensione</span><b id="vdSize">—</b></div>
+            <div class="vd-meta-row"><span>Durata</span><b id="vdDur">—</b></div>
+          </div>
+
+          <div class="vd-progress" id="vdProgress" hidden>
+            <div class="vd-bar"><i id="vdBar"></i></div>
+            <p class="vd-prog-text" id="vdProgText">Scaricamento…</p>
+          </div>
+
+          <div class="vd-actions">
+            <button class="btn primary" id="vdConfirm">Scarica sul dispositivo</button>
+            <button class="btn" id="vdCancel" hidden>Annulla</button>
+            <a class="btn" id="vdOpen" target="_blank" rel="noopener noreferrer" hidden>Apri in una scheda</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="glass reveal" id="vdInfoCard">
+        <header class="card-head"><h3>Cosa funziona</h3></header>
+        <ul class="vd-list">
+          <li class="ok"><span>Link diretti a un file video, quando il server li condivide (CORS)</span></li>
+          <li class="ok"><span>Video che ti hanno mandato, ospitati su un tuo server o su uno storage</span></li>
+          <li class="ok"><span>Salvataggio in streaming: su Chrome ed Edge scegli tu la cartella</span></li>
+          <li class="no"><span>Pagine di YouTube, Instagram, TikTok, Facebook, X: servono un estrattore lato server e i loro termini non lo consentono</span></li>
+        </ul>
+        <p class="vd-note">Scarica solo video che puoi scaricare: tuoi, con licenza libera, o per cui hai il permesso.</p>
+      </article>
+    </div>
+  </section>
+
+  <footer class="foot">
     <p><b>Aurora</b> — la tua giornata, in un colpo d'occhio.</p>
     <p class="foot-sub">Meteo <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> · cambi <a href="https://frankfurter.dev" target="_blank" rel="noopener">Frankfurter / BCE</a> · nessun account, nessun tracciamento: task, note e preferenze restano sul tuo dispositivo.</p>
   </footer>
 </main>
 
+<!-- ============ BOTTOM NAV (mobile) ============ -->
+<nav class="bottombar" id="bottombar" aria-label="Sezioni">
+  <button data-view="panoramica"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.6 12 3l9 7.6"/><path d="M5.5 9.5V20h13V9.5"/></svg><span>Home</span></button>
+  <button data-view="meteo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4 4 0 0 1 .3-8 6 6 0 0 1 11.4 1.5A3.6 3.6 0 0 1 18 18Z"/></svg><span>Meteo</span></button>
+  <button class="bb-menu" id="bbMenu"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7.4" height="7.4" rx="2.2"/><rect x="13.6" y="3" width="7.4" height="7.4" rx="2.2"/><rect x="3" y="13.6" width="7.4" height="7.4" rx="2.2"/><rect x="13.6" y="13.6" width="7.4" height="7.4" rx="2.2"/></svg><span>Menu</span></button>
+  <button data-view="giornata"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 4.5 4.5L20 6"/></svg><span>Giornata</span></button>
+  <button data-view="strumenti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6.5a3.5 3.5 0 0 0 4.6 4.6L21 13l-8 8-2-2 1.9-1.9a3.5 3.5 0 0 1-4.6-4.6L4 8.4 8.4 4l1.9 1.9Z"/></svg><span>Strumenti</span></button>
+</nav>
+
+<!-- ============ MENU LAUNCHER ============ -->
+<div class="menu-overlay" id="menuOverlay" hidden>
+  <div class="menu-panel glass" role="dialog" aria-modal="true" aria-label="Menu delle funzionalità">
+    <header class="menu-head">
+      <div>
+        <p class="label">Aurora</p>
+        <h2>Tutto quello che sa fare</h2>
+      </div>
+      <button class="icon-btn" id="menuClose" aria-label="Chiudi menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+    <div class="menu-grid" id="menuGrid"></div>
+    <div class="menu-foot"><span><kbd>Ctrl</kbd><kbd>K</kbd> barra dei comandi</span><span><kbd>Esc</kbd> chiudi</span></div>
+  </div>
+</div>
+
+<!-- ============ COMMAND PALETTE ============ -->
 <div class="palette-overlay" id="paletteOverlay" hidden>
   <div class="palette glass" role="dialog" aria-modal="true" aria-label="Barra dei comandi">
     <div class="palette-input">
