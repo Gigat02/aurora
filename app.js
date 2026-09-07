@@ -1284,7 +1284,10 @@
     download: SVG('<path d="M12 3.5v11M7.8 10.5 12 14.7l4.2-4.2"/><path d="M4.5 17v2.5h15V17"/>'),
     moon:     SVG('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>'),
     search:   SVG('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>'),
-    refresh:  SVG('<path d="M20 11.5a8 8 0 1 1-2.6-5.4"/><path d="M20 3.5v5h-5"/>')
+    refresh:  SVG('<path d="M20 11.5a8 8 0 1 1-2.6-5.4"/><path d="M20 3.5v5h-5"/>'),
+    split:    SVG('<path d="M6 3v5a4 4 0 0 0 4 4h4a4 4 0 0 1 4 4v5"/><path d="M18 3v5a4 4 0 0 1-4 4h-4a4 4 0 0 0-4 4v5"/>'),
+    share:    SVG('<circle cx="18" cy="5.5" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="18.5" r="2.8"/><path d="m8.4 10.7 7.2-3.9M8.4 13.3l7.2 3.9"/>'),
+    scan:     SVG('<path d="M3 8.5V6a3 3 0 0 1 3-3h2.5M15.5 3H18a3 3 0 0 1 3 3v2.5M21 15.5V18a3 3 0 0 1-3 3h-2.5M8.5 21H6a3 3 0 0 1-3-3v-2.5"/><path d="M6.5 12h11"/>')
   };
 
   const FEATURES = [
@@ -1300,10 +1303,15 @@
     { id: "task",  ico: "check", t: "Task di oggi",  s: "lista con barra di avanzamento", view: "giornata", card: "taskCard" },
     { id: "note",  ico: "note",  t: "Blocco note",   s: "si salva mentre scrivi",        view: "giornata", card: "noteCard" },
 
+    { sep: "Con gli amici" },
+    { id: "conto",     ico: "split", t: "Dividi il conto",  s: "chi ha pagato cosa, chi rimborsa chi", view: "conto", card: "expenseCard" },
+    { id: "condividi", ico: "share", t: "Passa il conto",   s: "link e QR, senza account",            view: "conto", card: "shareCard" },
+
     { sep: "Strumenti" },
+    { id: "scan",  ico: "scan",     t: "Scanner QR",        s: "leggi un codice con la fotocamera", view: "strumenti", card: "scanCard" },
+    { id: "qr",    ico: "qr",       t: "Generatore QR",     s: "link, testo, credenziali wifi", view: "strumenti", card: "qrCard" },
     { id: "fx",    ico: "euro",     t: "Cambio valuta",     s: "31 valute ai tassi BCE",        view: "strumenti", card: "fxCard" },
     { id: "conv",  ico: "ruler",    t: "Convertitore",      s: "lunghezza, peso, volume, dati", view: "strumenti", card: "convCard" },
-    { id: "qr",    ico: "qr",       t: "Generatore QR",     s: "link, testo, credenziali wifi", view: "strumenti", card: "qrCard" },
     { id: "video", ico: "download", t: "Salva un video",    s: "da link diretto, con conferma", view: "video",     card: "videoCard" },
 
     { sep: "Preferenze" },
@@ -1312,8 +1320,12 @@
     { id: "refresh", ico: "refresh", t: "Aggiorna il meteo", s: "ricarica i dati live",          act: refreshWeather }
   ];
 
-  const QUICK = ["meteo-24", "focus", "task", "video", "fx", "conv", "qr", "meteo-air"];
-  const VIEW_NAMES = ["panoramica", "meteo", "giornata", "strumenti", "video"];
+  const QUICK = ["conto", "scan", "meteo-24", "focus", "task", "fx", "qr", "video"];
+  const VIEW_NAMES = ["panoramica", "meteo", "giornata", "strumenti", "conto", "video"];
+
+  // i moduli registrano qui cosa fare quando si lascia la loro vista
+  // (per esempio: spegnere la fotocamera dello scanner)
+  const onLeave = {};
 
   function featureById(id) { return FEATURES.filter((f) => f.id === id)[0]; }
 
@@ -1350,6 +1362,7 @@
 
     const changed = currentView !== name;
     if (changed) {
+      if (currentView && onLeave[currentView]) { try { onLeave[currentView](); } catch (e) {} }
       $$(".view").forEach((v) => v.classList.toggle("is-active", v.dataset.view === name));
       $$(".tab", tabsEl).forEach((t) => t.classList.toggle("is-on", t.dataset.view === name));
       $$("#bottombar button[data-view]").forEach((b) => b.classList.toggle("is-on", b.dataset.view === name));
@@ -1371,9 +1384,102 @@
     }
   }
 
-  function routeFromHash(instant) {
+  /* ---- lo strato di azioni via link ----
+     Ogni indirizzo puo portare con se un comando:
+       #/conto?d=...              apre un conto condiviso
+       #/strumenti?fx=100,EUR,USD converte una cifra
+       #/strumenti?conv=10,km,mi  converte una misura
+       #/strumenti?qr=testo       genera un QR
+       #/giornata?task=comprare   aggiunge un task
+       #/giornata?focus=25        avvia il timer
+       #/meteo?citta=Milano       cambia localita
+     E lo stesso meccanismo che usa la condivisione via QR, ed e cio
+     che rende Aurora pilotabile dai Comandi Rapidi (e quindi da Siri). */
+  function parseHash() {
     const raw = (location.hash || "").replace(/^#\/?/, "");
-    showView(raw || "panoramica", { silent: true, instant: !!instant });
+    const q = raw.indexOf("?");
+    return {
+      name: (q < 0 ? raw : raw.slice(0, q)) || "panoramica",
+      params: new URLSearchParams(q < 0 ? "" : raw.slice(q + 1))
+    };
+  }
+
+  function runActions(p) {
+    let done = false;
+    const num = (v) => parseFloat(String(v).replace(",", "."));
+
+    if (p.has("d")) { importBill(p.get("d")); showView("conto", { silent: true }); done = true; }
+
+    if (p.has("fx")) {
+      const [a, from, to] = p.get("fx").split(",").map((s) => s.trim());
+      if (from && to) {
+        $("#fxAmount").value = isFinite(num(a)) ? num(a) : 1;
+        $("#fxFrom").value = from.toUpperCase();
+        $("#fxTo").value = to.toUpperCase();
+        calcFx();
+        showView("strumenti", { card: "fxCard", silent: true });
+        done = true;
+      }
+    }
+
+    if (p.has("conv")) {
+      const [a, from, to] = p.get("conv").split(",").map((s) => s.trim());
+      const cat = Object.keys(UNITS).filter((c) =>
+        c !== "Temperatura" && UNITS[c] && UNITS[c][from] != null && UNITS[c][to] != null)[0]
+        || ([from, to].every((u) => TEMPS.indexOf(u) >= 0) ? "Temperatura" : null);
+      if (cat) {
+        $("#convCat").value = cat;
+        fillConvUnits();
+        $("#convFrom").value = from; $("#convTo").value = to;
+        $("#convA").value = isFinite(num(a)) ? num(a) : 1;
+        calcConv();
+        showView("strumenti", { card: "convCard", silent: true });
+        done = true;
+      }
+    }
+
+    if (p.has("qr")) {
+      $("#qrText").value = p.get("qr");
+      paintQR();
+      showView("strumenti", { card: "qrCard", silent: true });
+      done = true;
+    }
+
+    if (p.has("task")) {
+      if (addTask(p.get("task"))) { toast("Task aggiunto."); showView("giornata", { card: "taskCard", silent: true }); done = true; }
+    }
+
+    if (p.has("focus")) {
+      const m = String(parseInt(p.get("focus"), 10) || 25);
+      const btn = $('#focusModes .pill[data-min="' + m + '"]');
+      if (btn) btn.click();
+      showView("giornata", { card: "focusCard", silent: true });
+      startFocus();
+      done = true;
+    }
+
+    if (p.has("citta")) {
+      const q = p.get("citta");
+      jget("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(q) + "&count=1&language=it&format=json")
+        .then((j) => {
+          const r = j.results && j.results[0];
+          if (r) loadWeather(r.latitude, r.longitude, r.name);
+          else toast("Non trovo la località “" + q + "”.");
+        })
+        .catch(() => toast("Ricerca non disponibile."));
+      showView("meteo", { silent: true });
+      done = true;
+    }
+
+    // il comando e stato eseguito: l'indirizzo torna pulito,
+    // cosi un aggiornamento della pagina non lo ripete
+    if (done) history.replaceState(null, "", "#/" + (currentView || "panoramica"));
+  }
+
+  function routeFromHash(instant) {
+    const h = parseHash();
+    showView(h.name, { silent: true, instant: !!instant });
+    if (Array.from(h.params.keys()).length) runActions(h.params);
   }
   addEventListener("popstate", () => routeFromHash(true));
   addEventListener("hashchange", () => routeFromHash(true));
@@ -1432,8 +1538,8 @@
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") closeMenu();
   });
 
-  routeFromHash(true);
-  if (!location.hash) history.replaceState(null, "", "#/panoramica");
+  // la prima navigazione avviene in fondo al file, quando tutti i
+  // moduli che le azioni possono richiamare sono stati definiti
 
   /* ==========================================================
      15. SALVA UN VIDEO
@@ -1706,6 +1812,511 @@
   }
 
   vdCancel.addEventListener("click", () => { if (VD.abort) VD.abort.abort(); });
+
+
+  /* ==========================================================
+     16. DIVIDI IL CONTO
+     Chi ha pagato cosa, chi deve rimborsare chi. I conti si fanno
+     in centesimi, cosi non si perde un soldo per strada.
+     ========================================================== */
+  const PCOL = ["#8b7bff", "#22d3ee", "#ff6bab", "#4ade80", "#ffd76b",
+                "#ff9d5c", "#a78bfa", "#38bdf8", "#fb7185", "#34d399"];
+  const pcol = (i) => PCOL[i % PCOL.length];
+
+  const MAX_PEOPLE = 40, MAX_EXP = 100;
+  const eur = (cents) =>
+    (cents / 100).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+
+  let bill = store.get("bill", { people: [], expenses: [] });
+  if (!bill || !Array.isArray(bill.people) || !Array.isArray(bill.expenses)) bill = { people: [], expenses: [] };
+  let splitSel = new Set();
+
+  const peopleEl = $("#people"), expensesEl = $("#expenses"),
+        splitChipsEl = $("#splitChips"), expPayer = $("#expPayer");
+
+  /* ---- quote in centesimi, resto distribuito ai primi ---- */
+  function shares(totalCents, n) {
+    const base = Math.floor(totalCents / n), rest = totalCents - base * n;
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(base + (i < rest ? 1 : 0));
+    return out;
+  }
+
+  function balances() {
+    const b = new Array(bill.people.length).fill(0);
+    bill.expenses.forEach((e) => {
+      const cents = Math.round(e.a * 100);
+      const members = e.s.filter((i) => i >= 0 && i < bill.people.length);
+      if (!members.length || e.p < 0 || e.p >= bill.people.length) return;
+      b[e.p] += cents;
+      const q = shares(cents, members.length);
+      members.forEach((m, k) => { b[m] -= q[k]; });
+    });
+    return b;
+  }
+
+  /* ---- rimborsi: si accoppia sempre il credito piu grande col debito
+         piu grande, cosi ogni passaggio chiude almeno una posizione
+         e i trasferimenti restano al massimo (persone - 1) ---- */
+  function settle(b) {
+    const cred = [], deb = [];
+    b.forEach((v, i) => { if (v > 0) cred.push({ i: i, v: v }); else if (v < 0) deb.push({ i: i, v: -v }); });
+    cred.sort((x, y) => y.v - x.v);
+    deb.sort((x, y) => y.v - x.v);
+    const out = [];
+    let ci = 0, di = 0;
+    while (ci < cred.length && di < deb.length) {
+      const amt = Math.min(cred[ci].v, deb[di].v);
+      if (amt > 0) out.push({ from: deb[di].i, to: cred[ci].i, amt: amt });
+      cred[ci].v -= amt; deb[di].v -= amt;
+      if (cred[ci].v === 0) ci++;
+      if (deb[di].v === 0) di++;
+    }
+    return out;
+  }
+
+  function saveBill() { store.set("bill", bill); }
+
+  function renderPeople() {
+    peopleEl.innerHTML = bill.people.map((n, i) =>
+      '<li><span class="dot" style="background:' + pcol(i) + ';color:' + pcol(i) + '"></span>' +
+      esc(n) + '<button class="del" data-person="' + i + '" aria-label="Togli ' + esc(n) + '">&times;</button></li>'
+    ).join("");
+    $("#peopleN").textContent = bill.people.length;
+    $("#peopleEmpty").hidden = bill.people.length > 0;
+
+    expPayer.innerHTML = bill.people.map((n, i) => '<option value="' + i + '">' + esc(n) + "</option>").join("")
+      || '<option value="">—</option>';
+
+    splitChipsEl.innerHTML = bill.people.map((n, i) =>
+      '<button type="button" class="split-chip' + (splitSel.has(i) ? " is-on" : "") + '" data-split="' + i + '">' + esc(n) + "</button>"
+    ).join("");
+  }
+
+  function renderExpenses() {
+    let total = 0;
+    expensesEl.innerHTML = bill.expenses.map((e, i) => {
+      const cents = Math.round(e.a * 100);
+      total += cents;
+      const payer = bill.people[e.p] || "?";
+      const n = e.s.length;
+      return '<li><div class="e-main"><div class="e-desc">' + esc(e.d || "Spesa") + "</div>" +
+        '<div class="e-meta">ha pagato ' + esc(payer) + " · divisa fra " + n + (n === 1 ? " persona" : " persone") + "</div></div>" +
+        '<div class="e-amount">' + eur(cents) + "</div>" +
+        '<button class="del" data-exp="' + i + '" aria-label="Elimina">&times;</button></li>';
+    }).join("");
+    $("#totalSpent").textContent = eur(total);
+    $("#expEmpty").hidden = bill.expenses.length > 0;
+  }
+
+  const ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15"/><path d="m13.5 6.5 6 5.5-6 5.5"/></svg>';
+
+  function renderSettle() {
+    const b = balances();
+    const moves = settle(b);
+    const hasData = bill.people.length > 1 && bill.expenses.length > 0;
+
+    $("#settleEmpty").hidden = hasData;
+    $("#settleSub").textContent = !hasData ? "—"
+      : moves.length === 0 ? "siete già pari"
+      : moves.length + (moves.length === 1 ? " rimborso" : " rimborsi");
+
+    if (!hasData) { $("#settle").innerHTML = ""; $("#balances").innerHTML = ""; return; }
+
+    $("#settle").innerHTML = moves.length
+      ? moves.map((m) =>
+          '<li><span class="s-from" style="color:' + pcol(m.from) + '">' + esc(bill.people[m.from]) + "</span>" +
+          '<span class="s-arrow">' + ARROW + "</span>" +
+          '<span class="s-to" style="color:' + pcol(m.to) + '">' + esc(bill.people[m.to]) + "</span>" +
+          '<span class="s-amount">' + eur(m.amt) + "</span></li>").join("")
+      : '<li class="settle-done">Nessuno deve niente a nessuno: il conto torna.</li>';
+
+    const max = Math.max.apply(null, b.map(Math.abs).concat([1]));
+    $("#balances").innerHTML = bill.people.map((n, i) => {
+      const v = b[i], pct = (Math.abs(v) / max) * 50;
+      const cls = v >= 0 ? "pos" : "neg";
+      const style = v >= 0
+        ? "left:50%;width:" + pct.toFixed(1) + "%"
+        : "right:50%;width:" + pct.toFixed(1) + "%";
+      return '<div class="bal-row"><span class="bal-name">' + esc(n) + "</span>" +
+        '<span class="bal-track"><i class="' + cls + '" style="' + style + '"></i></span>' +
+        '<span class="bal-val ' + cls + '">' + (v > 0 ? "+" : "") + eur(v) + "</span></div>";
+    }).join("");
+  }
+
+  function renderBill() {
+    renderPeople();
+    renderExpenses();
+    renderSettle();
+    updateShare();
+    saveBill();
+  }
+
+  /* ---- persone ---- */
+  $("#personForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = $("#personInput").value.trim().slice(0, 24);
+    if (!name) return;
+    if (bill.people.length >= MAX_PEOPLE) { toast("Sono già in tanti così."); return; }
+    bill.people.push(name);
+    splitSel.add(bill.people.length - 1);
+    $("#personInput").value = "";
+    renderBill();
+  });
+
+  peopleEl.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-person]");
+    if (!b) return;
+    const k = +b.dataset.person;
+    bill.people.splice(k, 1);
+    // le spese seguono: via quelle pagate da chi esce, indici ricompattati
+    bill.expenses = bill.expenses
+      .filter((x) => x.p !== k)
+      .map((x) => ({
+        d: x.d, a: x.a,
+        p: x.p > k ? x.p - 1 : x.p,
+        s: x.s.filter((i) => i !== k).map((i) => (i > k ? i - 1 : i))
+      }))
+      .filter((x) => x.s.length > 0);
+    const next = new Set();
+    splitSel.forEach((i) => { if (i < k) next.add(i); else if (i > k) next.add(i - 1); });
+    splitSel = next;
+    renderBill();
+  });
+
+  splitChipsEl.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-split]");
+    if (!b) return;
+    const i = +b.dataset.split;
+    if (splitSel.has(i)) splitSel.delete(i); else splitSel.add(i);
+    b.classList.toggle("is-on", splitSel.has(i));
+  });
+
+  $("#splitAll").addEventListener("click", () => {
+    splitSel = new Set(bill.people.map((_, i) => i));
+    renderPeople();
+  });
+
+  /* ---- spese ---- */
+  $("#expenseForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (bill.people.length < 2) { toast("Aggiungi almeno due persone."); return; }
+    const amount = parseFloat(String($("#expAmount").value).replace(",", "."));
+    if (!isFinite(amount) || amount <= 0) { toast("Metti un importo maggiore di zero."); return; }
+    const members = bill.people.map((_, i) => i).filter((i) => splitSel.has(i));
+    if (!members.length) { toast("Scegli fra chi va divisa."); return; }
+    if (bill.expenses.length >= MAX_EXP) { toast("Troppe spese per un conto solo."); return; }
+
+    bill.expenses.unshift({
+      d: $("#expDesc").value.trim().slice(0, 40) || "Spesa",
+      a: Math.round(amount * 100) / 100,
+      p: +expPayer.value || 0,
+      s: members
+    });
+    $("#expDesc").value = ""; $("#expAmount").value = "";
+    renderBill();
+  });
+
+  expensesEl.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-exp]");
+    if (!b) return;
+    bill.expenses.splice(+b.dataset.exp, 1);
+    renderBill();
+  });
+
+  $("#shareReset").addEventListener("click", () => {
+    if (!bill.people.length && !bill.expenses.length) return;
+    bill = { people: [], expenses: [] };
+    splitSel = new Set();
+    renderBill();
+    toast("Conto azzerato.");
+  });
+
+  /* ==========================================================
+     17. CONDIVISIONE SENZA SERVER
+     Lo stato viaggia dentro il link. I separatori sono , | ^ :
+     caratteri che encodeURIComponent trasforma sempre, quindi non
+     possono comparire dentro un nome o una descrizione.
+     ========================================================== */
+  const B62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+  function billEncode(b) {
+    if (!b.people.length) return "";
+    const names = b.people.map(encodeURIComponent).join("|");
+    const exps = b.expenses.map((e) => [
+      encodeURIComponent(e.d),
+      String(e.a),
+      B62[e.p] || "0",
+      e.s.map((i) => B62[i] || "0").join("")
+    ].join("^")).join("|");
+    return "A1," + names + "," + exps;
+  }
+
+  function billDecode(s) {
+    const parts = String(s || "").split(",");
+    if (parts[0] !== "A1") return null;
+    let people;
+    try { people = parts[1] ? parts[1].split("|").map(decodeURIComponent) : []; }
+    catch (e) { return null; }
+    people = people.map((n) => String(n).slice(0, 24)).slice(0, MAX_PEOPLE);
+    if (!people.length) return null;
+
+    const expenses = (parts[2] ? parts[2].split("|") : []).map((chunk) => {
+      const f = chunk.split("^");
+      let d = "";
+      try { d = decodeURIComponent(f[0] || ""); } catch (e) { d = ""; }
+      return {
+        d: d.slice(0, 40) || "Spesa",
+        a: Math.round((parseFloat(f[1]) || 0) * 100) / 100,
+        p: B62.indexOf(f[2] || "0"),
+        s: String(f[3] || "").split("").map((c) => B62.indexOf(c)).filter((i) => i >= 0 && i < people.length)
+      };
+    }).filter((e) => e.a > 0 && e.p >= 0 && e.p < people.length && e.s.length).slice(0, MAX_EXP);
+
+    return { people: people, expenses: expenses };
+  }
+
+  function shareUrl() {
+    const payload = billEncode(bill);
+    if (!payload) return "";
+    return location.origin + location.pathname + "#/conto?d=" + payload;
+  }
+
+  const QR_LIMIT = 213;   // capacita del nostro encoder: versione 10, livello M
+
+  function updateShare() {
+    const url = shareUrl();
+    const box = $(".share-qr"), size = $("#shareSize");
+    if (!url) {
+      box.classList.add("is-empty");
+      size.textContent = "Aggiungi qualcuno e una spesa per generare il link.";
+      size.classList.remove("is-over");
+      $("#shareCopy").disabled = true;
+      return;
+    }
+    $("#shareCopy").disabled = false;
+    const bytes = new TextEncoder().encode(url).length;
+    if (bytes <= QR_LIMIT) {
+      try {
+        QR.draw($("#shareQr"), url);
+        box.classList.remove("is-empty");
+        size.classList.remove("is-over");
+        size.textContent = "QR: " + bytes + " / " + QR_LIMIT + " caratteri";
+        return;
+      } catch (e) { /* rientra nel ramo sotto */ }
+    }
+    box.classList.add("is-empty");
+    size.classList.add("is-over");
+    size.textContent = "Il conto è troppo lungo per un QR (" + bytes + " caratteri): usa Copia link.";
+  }
+
+  $("#shareCopy").addEventListener("click", () => {
+    const url = shareUrl();
+    if (!url) return;
+    navigator.clipboard.writeText(url)
+      .then(() => toast("Link copiato: incollalo dove vuoi."))
+      .catch(() => toast("Non riesco a copiare: il link è nella barra QR."));
+  });
+
+  if (navigator.share) {
+    $("#shareNative").hidden = false;
+    $("#shareNative").addEventListener("click", () => {
+      const url = shareUrl();
+      if (!url) return;
+      navigator.share({ title: "Il conto di stasera", text: "Ecco come pareggiamo:", url: url })
+        .catch(() => {});
+    });
+  }
+
+  function importBill(payload) {
+    const got = billDecode(payload);
+    if (!got) { toast("Questo link non contiene un conto valido."); return false; }
+    bill = got;
+    splitSel = new Set(bill.people.map((_, i) => i));
+    renderBill();
+    toast("Conto caricato dal link.");
+    return true;
+  }
+
+  renderBill();
+
+  /* ==========================================================
+     18. SCANNER QR
+     jsQR viene caricato solo quando serve davvero, ed e nel repo
+     (non da CDN) perche lo scanner deve funzionare anche offline.
+     ========================================================== */
+  const scanStage = $("#scanStage"), scanVideo = $("#scanVideo"), scanCanvas = $("#scanCanvas"),
+        scanIdle = $("#scanIdle"), scanResult = $("#scanResult"),
+        scanStartBtn = $("#scanStart"), scanStopBtn = $("#scanStop");
+  // Il ciclo di lettura gira su un timer, non su requestAnimationFrame:
+  // rAF viene sospeso quando il browser non sta ridipingendo, e uno
+  // scanner che smette di leggere senza dirlo e peggio di uno lento.
+  let scanStream = null, scanTimer = null;
+
+  function loadJsQR() {
+    if (window.jsQR) return Promise.resolve(true);
+    return new Promise((res) => {
+      const s = document.createElement("script");
+      s.src = "vendor/jsqr.js";
+      s.onload = () => res(!!window.jsQR);
+      s.onerror = () => res(false);
+      document.head.appendChild(s);
+    });
+  }
+
+  function scanSay(kind, html) {
+    scanResult.hidden = false;
+    scanResult.className = "scan-result is-" + kind;
+    scanResult.innerHTML = html;
+  }
+
+  async function scanStart() {
+    scanResult.hidden = true;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return scanSay("error", "<b>Questo browser non dà accesso alla fotocamera.</b>");
+    }
+    scanStartBtn.disabled = true;
+    scanStartBtn.textContent = "Preparo…";
+
+    const ready = await loadJsQR();
+    if (!ready) {
+      scanStartBtn.disabled = false;
+      scanStartBtn.textContent = "Accendi la fotocamera";
+      return scanSay("error", "<b>Non riesco a caricare il decoder.</b> Riprova quando sei online almeno una volta.");
+    }
+
+    try {
+      scanStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } }, audio: false
+      });
+    } catch (err) {
+      scanStartBtn.disabled = false;
+      scanStartBtn.textContent = "Accendi la fotocamera";
+      const n = err && err.name;
+      const msg =
+        n === "NotAllowedError" ? "<b>Permesso negato.</b><p>Consenti l'accesso alla fotocamera dalle impostazioni del sito e riprova.</p>" :
+        n === "NotFoundError"   ? "<b>Nessuna fotocamera trovata.</b>" :
+        n === "NotReadableError"? "<b>La fotocamera è occupata da un'altra app.</b>" :
+        !window.isSecureContext ? "<b>Serve una connessione sicura.</b><p>La fotocamera funziona solo su https o su localhost.</p>" :
+        "<b>Non riesco ad accendere la fotocamera.</b><p>" + esc(String(n || "errore sconosciuto")) + "</p>";
+      return scanSay("error", msg);
+    }
+
+    scanVideo.srcObject = scanStream;
+    try { await scanVideo.play(); } catch (e) {}
+    scanStage.classList.add("is-live");
+    scanIdle.hidden = true;
+    scanStartBtn.hidden = true;
+    scanStartBtn.disabled = false;
+    scanStartBtn.textContent = "Accendi la fotocamera";
+    scanStopBtn.hidden = false;
+    clearInterval(scanTimer);
+    scanTimer = setInterval(scanTick, 90);   // ~11 letture al secondo
+  }
+
+  function scanStop() {
+    clearInterval(scanTimer);
+    scanTimer = null;
+    if (scanStream) { scanStream.getTracks().forEach((t) => t.stop()); scanStream = null; }
+    scanVideo.srcObject = null;
+    scanStage.classList.remove("is-live");
+    scanIdle.hidden = false;
+    scanStartBtn.hidden = false;
+    scanStopBtn.hidden = true;
+  }
+
+  function scanTick() {
+    if (scanVideo.readyState < 2) return;
+    const w = scanVideo.videoWidth, h = scanVideo.videoHeight;
+    if (!w || !h) return;
+    const k = Math.min(1, 560 / Math.max(w, h));
+    scanCanvas.width = Math.round(w * k);
+    scanCanvas.height = Math.round(h * k);
+    const ctx = scanCanvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(scanVideo, 0, 0, scanCanvas.width, scanCanvas.height);
+    const img = ctx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
+    const found = window.jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+    if (found && found.data) onScan(found.data);
+  }
+
+  function onScan(text) {
+    scanStop();
+    beep();
+    if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
+    showScanned(text);
+  }
+
+  // Il contenuto di un QR e dato non fidato: viene sempre mostrato per esteso
+  // e non si apre mai da solo. Decide chi legge.
+  function showScanned(text) {
+    const safe = esc(text);
+    const base = location.origin + location.pathname;
+
+    if (text.indexOf(base) === 0 && text.indexOf("#/conto?d=") > 0) {
+      const payload = text.slice(text.indexOf("#/conto?d=") + 10);
+      scanSay("ok",
+        '<p class="scan-kind">Conto condiviso</p>' +
+        '<p class="scan-text">Un conto da aprire in Aurora</p>' +
+        '<div class="scan-btns"><button class="btn primary sm" id="scanOpenBill">Apri il conto</button>' +
+        '<button class="btn sm" id="scanAgain">Scansiona ancora</button></div>');
+      $("#scanOpenBill").addEventListener("click", () => {
+        if (importBill(payload)) showView("conto", { card: "settleCard" });
+      });
+      wireAgain();
+      return;
+    }
+
+    const wifi = /^WIFI:(.*);;?$/i.exec(text.trim());
+    if (wifi) {
+      const get = (k) => { const m = new RegExp(k + ":([^;]*)").exec(wifi[1]); return m ? m[1] : ""; };
+      const ssid = get("S"), pass = get("P"), type = get("T") || "—";
+      scanSay("ok",
+        '<p class="scan-kind">Rete Wi-Fi</p>' +
+        '<div class="scan-wifi">' +
+        "<div><span>Rete</span><b>" + esc(ssid) + "</b></div>" +
+        "<div><span>Password</span><b>" + esc(pass || "nessuna") + "</b></div>" +
+        "<div><span>Sicurezza</span><b>" + esc(type) + "</b></div></div>" +
+        '<div class="scan-btns">' + (pass ? '<button class="btn primary sm" id="scanCopy">Copia password</button>' : "") +
+        '<button class="btn sm" id="scanAgain">Scansiona ancora</button></div>');
+      if (pass) $("#scanCopy").addEventListener("click", () => copyText(pass));
+      wireAgain();
+      return;
+    }
+
+    const isUrl = /^https?:\/\//i.test(text.trim());
+    scanSay("ok",
+      '<p class="scan-kind">' + (isUrl ? "Collegamento" : "Testo") + "</p>" +
+      '<p class="scan-text">' + safe + "</p>" +
+      '<div class="scan-btns">' +
+      (isUrl ? '<a class="btn primary sm" href="' + esc(text.trim()) + '" target="_blank" rel="noopener noreferrer">Apri il link</a>' : "") +
+      '<button class="btn sm" id="scanCopy">Copia</button>' +
+      '<button class="btn sm" id="scanAgain">Scansiona ancora</button></div>');
+    $("#scanCopy").addEventListener("click", () => copyText(text));
+    wireAgain();
+  }
+
+  function wireAgain() {
+    const b = $("#scanAgain");
+    if (b) b.addEventListener("click", () => { scanResult.hidden = true; scanStart(); });
+  }
+  function copyText(t) {
+    navigator.clipboard.writeText(t).then(() => toast("Copiato."), () => toast("Non riesco a copiare."));
+  }
+
+  scanStartBtn.addEventListener("click", scanStart);
+  scanStopBtn.addEventListener("click", scanStop);
+  addEventListener("visibilitychange", () => { if (document.hidden && scanStream) scanStop(); });
+
+  // lasciando gli Strumenti la fotocamera si spegne da sola
+  onLeave.strumenti = function () { if (scanStream) scanStop(); };
+
+  /* ==========================================================
+     19. PRIMA NAVIGAZIONE
+     Va fatta qui, in fondo: le azioni via link possono richiamare
+     qualunque modulo, e a questo punto esistono tutti.
+     ========================================================== */
+  routeFromHash(true);
+  if (!location.hash) history.replaceState(null, "", "#/panoramica");
 
 
   // aggiorna il ciclo del sole ogni minuto
